@@ -82,6 +82,7 @@ flowchart TD
     L -- done --> Z([end])
     T -.-> X1[extract_load_tool<br/>API → file]
     T -.-> X2[transform_load_tool<br/>LLM-written pandas]
+    X2 --> SB[[Docker sandbox<br/>no network · read-only]]
 ```
 
 </td>
@@ -148,6 +149,7 @@ cp .env.example .env
 uv sync
 docker compose up -d --wait        # Postgres on :5437 (auto-seeded) + Adminer on :8080
 ollama pull qwen2.5:3b             # ~1.9 GB, runs on a 4 GB GPU or on CPU
+# the pandas sandbox image (Dockerfile.sandbox) builds automatically on the first transform
 
 uv run python main.py "What is the average fare by city?"
 uv run python main.py              # interactive mode
@@ -157,7 +159,7 @@ uv run python main.py              # interactive mode
 |---|---|
 | `uv run python main.py "<question>"` | Ask one question |
 | `uv run python main.py --graphs` | Print the compiled LangGraph graphs as Mermaid |
-| `uv run python test_guards.py` | Safety checks with no LLM: SQL guard, read-only role, path confinement, SSRF |
+| `uv run python test_guards.py` | Safety checks with no LLM: SQL guard, read-only role, path confinement, SSRF, and sandbox escape attempts |
 | `uv run python smoke_test.py` | 5 end-to-end scenarios against the real LLM and database |
 
 To browse the data, open http://localhost:8080 and log in with system `PostgreSQL`, server `db`, user `agent_user`, password `agent_pass` and database `agent_db`.
@@ -170,7 +172,7 @@ To browse the data, open http://localhost:8080 and log in with system `PostgreSQ
 | *Who are the top 3 drivers by average rating?* | `sql` | CTE + 3-table join + `ORDER BY … LIMIT 3` |
 | *Delete all failed payments* | `sql` | Blocked by the safety gate; nothing is executed |
 | *Extract https://pokeapi.co/api/v2/pokemon into data/extract as CSV* | `etl` | Writes `data/extract/extracted_data.csv` |
-| *Transform data/extract/extracted_data.csv to keep only bulbasaur, save as csv in data/transform* | `etl` | The LLM writes pandas code, which runs in an isolated process |
+| *Transform data/extract/extracted_data.csv to keep only bulbasaur, save as csv in data/transform* | `etl` | The LLM writes pandas code, which runs in a Docker sandbox |
 
 ---
 
@@ -201,10 +203,12 @@ The agent runs code and SQL written by a model, so it's built on the assumption 
 | **SQL: database role** | `agent_reader` has `SELECT` only, plus `default_transaction_read_only` and a 10 s `statement_timeout`. **This is the actual guarantee.** |
 | **Files** | ETL tools can only read and write inside `data/`. Absolute paths, `../` and symlink escapes are rejected. |
 | **Network** | Extraction allows only http(s) to public IPs. Loopback, private ranges, cloud metadata and redirects are refused. |
-| **Generated code** | Runs in a separate process with an empty environment (no keys or credentials), `data/` as its working directory and a 60 s timeout. The file preview is labelled as untrusted data in the prompt. |
+| **Generated code** | Runs in a throwaway **Docker sandbox**: `--network none`, read-only root filesystem, only `data/` mounted, no host environment or secrets, non-root user, all capabilities dropped, `no-new-privileges`, and limits of 512 MB memory, 1 CPU, 128 processes and 60 s (then killed). If Docker isn't available, the transform refuses to run. The file preview is labelled as untrusted data in the prompt. |
 | **Agent loop** | The ETL reason/act loop is capped by `recursion_limit`. |
 
-> ⚠️ **Generated pandas code is isolated but not sandboxed:** it still runs as your OS user. That's fine for local use with your own prompts. Before exposing the agent to other people, run that step in a container (`--network none --read-only`, with only `data/` mounted).
+> `test_guards.py` attempts real escapes from inside the sandbox and expects every one to fail: reaching the internet, reaching the host database, reading the project `.env` or `~/.ssh` keys, writing to the root filesystem, reading host environment variables, and running an infinite loop. The remaining exposure is the `data/` folder, which the code is meant to work on.
+>
+> Not covered: the extract tool checks a URL's address once, then connects, so a hostile domain could switch to an internal address in between (DNS rebinding). Pin the connection to the checked IP before letting untrusted users submit URLs.
 
 ---
 
@@ -219,8 +223,9 @@ models/schema.py    Pydantic graph state + structured-output schemas
 utils/
   llm_pick.py       tier → chat model (any provider via init_chat_model)
   database.py       schema-to-text for prompts, read-only query execution, SQL static check
-  etl_tools.py      API → CSV/JSON/Parquet, file preview, path + SSRF guards, isolated code runner
+  etl_tools.py      API → CSV/JSON/Parquet, file preview, path + SSRF guards, Docker sandbox runner
 init/               schema, read-only role, synthetic seed data
+Dockerfile.sandbox  pinned pandas/pyarrow image for generated code
 assets/             README images
 ```
 

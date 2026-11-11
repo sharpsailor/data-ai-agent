@@ -1,7 +1,10 @@
 import ipaddress
+import os
 import socket
 import subprocess
 import sys
+import uuid
+from functools import cache
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -64,12 +67,42 @@ class ETLTools:
 
     @staticmethod
     def execute_code(code: str, timeout: int = 60) -> str:
-        # ponytail: separate process, empty env (no API keys/DB creds), timeout, cwd=data/ — still NOT a
-        # sandbox: the code can touch the filesystem and network as this user. Upgrade path:
-        # `docker run --rm --network none --read-only -v ./data:/data --memory 512m python:3.12-slim`.
-        DATA.mkdir(exist_ok=True)
-        r = subprocess.run([sys.executable, "-I", "-c", code], cwd=DATA, env={},
-                           capture_output=True, text=True, timeout=timeout)
+        """Run LLM-generated code in a throwaway container: no network, read-only root, only data/ writable,
+        no env/secrets, non-root, capped CPU/memory/pids/time. Fails closed if Docker is unavailable."""
+        ensure_sandbox_image()
+        data = DATA.resolve()
+        data.mkdir(exist_ok=True)
+        name = f"etl-sandbox-{uuid.uuid4().hex[:12]}"
+        cmd = ["docker", "run", "--rm", "-i", "--name", name,
+               "--network", "none", "--read-only", "--tmpfs", "/tmp:size=64m",
+               "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+               "--user", f"{os.getuid()}:{os.getgid()}", "--env", "HOME=/tmp",
+               "--memory", "512m", "--cpus", "1", "--pids-limit", "128",
+               # Mounted at the same absolute path so host paths in the generated code work unchanged.
+               "-v", f"{data}:{data}:rw", "-w", str(data),
+               SANDBOX_IMAGE, "python", "-I", "-"]
+        try:
+            r = subprocess.run(cmd, input=code, capture_output=True, text=True, timeout=timeout, env=_docker_env())
+        except subprocess.TimeoutExpired:
+            subprocess.run(["docker", "kill", name], capture_output=True)
+            raise RuntimeError(f"Sandboxed code exceeded {timeout}s and was killed")
         if r.returncode:
             raise RuntimeError(r.stderr[-2000:])
         return r.stdout[-2000:] or "Code ran successfully."
+
+
+SANDBOX_IMAGE = "data-ai-agent-sandbox:1"
+
+
+def _docker_env() -> dict:
+    # The docker CLI only needs these; nothing from .env (API keys, DB creds) is passed along.
+    return {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_CONTEXT")}
+
+
+@cache
+def ensure_sandbox_image() -> None:
+    if subprocess.run(["docker", "image", "inspect", SANDBOX_IMAGE], capture_output=True, env=_docker_env()).returncode:
+        print(f"Building {SANDBOX_IMAGE} (first run only, ~1 min)...", file=sys.stderr)
+        # Dockerfile on stdin = empty build context (don't ship .venv/.env to the daemon).
+        subprocess.run(["docker", "build", "-q", "-t", SANDBOX_IMAGE, "-"], input=(ROOT / "Dockerfile.sandbox").read_bytes(),
+                       check=True, capture_output=True, env=_docker_env())

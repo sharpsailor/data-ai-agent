@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="322" viewBox="0 0 900 322" role="img" aria-label="data-ai-agent — write attempt blocked">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="342" viewBox="0 0 900 342" role="img" aria-label="data-ai-agent — write attempt blocked">
   <title>data-ai-agent — write attempt blocked</title>
-  <rect width="900" height="322" rx="10" fill="#0d1117"/>
-  <rect x="0.5" y="0.5" width="899" height="321" rx="10" fill="none" stroke="#30363d"/>
+  <rect width="900" height="342" rx="10" fill="#0d1117"/>
+  <rect x="0.5" y="0.5" width="899" height="341" rx="10" fill="none" stroke="#30363d"/>
   <path d="M0 10a10 10 0 0 1 10-10h880a10 10 0 0 1 10 10v24H0z" fill="#161b22"/>
   <line x1="0" y1="34" x2="900" y2="34" stroke="#30363d"/>
   <circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
@@ -17,6 +17,7 @@
     <text x="22" y="230" xml:space="preserve"><tspan fill="#8b949e">  database role  </tspan><tspan fill="#c9d1d9">DELETE as agent_reader → </tspan><tspan fill="#f85149">cannot execute DELETE in a read-only transaction</tspan></text>
     <text x="22" y="250" xml:space="preserve"><tspan fill="#8b949e">  ETL paths      </tspan><tspan fill="#c9d1d9">../../etc/passwd, /etc/passwd, data/../.env           → rejected</tspan></text>
     <text x="22" y="270" xml:space="preserve"><tspan fill="#8b949e">  SSRF           </tspan><tspan fill="#c9d1d9">127.0.0.1, localhost, 10.0.0.1, 169.254.169.254, file:// → rejected</tspan></text>
-    <text x="22" y="290" xml:space="preserve"><tspan fill="#3fb950" font-weight="600">✔ </tspan><tspan fill="#3fb950">all guard checks passed</tspan></text>
+    <text x="22" y="290" xml:space="preserve"><tspan fill="#8b949e">  sandbox        </tspan><tspan fill="#c9d1d9">internet, host DB, .env, ~/.ssh, rootfs write, host env, ∞ loop → blocked</tspan></text>
+    <text x="22" y="310" xml:space="preserve"><tspan fill="#3fb950" font-weight="600">✔ </tspan><tspan fill="#3fb950">all guard checks passed</tspan></text>
   </g>
 </svg>
