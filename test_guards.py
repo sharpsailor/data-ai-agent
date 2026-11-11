@@ -20,6 +20,25 @@ try:
 except psycopg2.Error as e:
     assert "read-only" in str(e), e
 
+# ETL paths are confined to data/, URLs must be public, generated code gets no secrets.
+from utils.etl_tools import DATA, ETLTools, check_public_url, resolve
+
+assert resolve("data/extract/x.csv") == DATA.resolve() / "extract/x.csv"
+for bad_path in ["../../etc/passwd", "/etc/passwd", "data/../.env", "agents/data_agent.py"]:
+    try:
+        resolve(bad_path)
+        raise AssertionError(f"path escape allowed: {bad_path}")
+    except ValueError:
+        pass
+for bad_url in ["http://127.0.0.1:5437/", "http://169.254.169.254/latest/meta-data/",
+                "http://localhost:8080/", "http://10.0.0.1/", "file:///etc/passwd", "ftp://example.com/"]:
+    try:
+        check_public_url(bad_url)
+        raise AssertionError(f"SSRF allowed: {bad_url}")
+    except ValueError:
+        pass
+assert ETLTools.execute_code("import os; print(len(os.environ))").strip().startswith(("0", "1"))
+
 cols, rows = Database().execute_query("SELECT DISTINCT payment_method FROM payments ORDER BY 1")
 assert cols == ["payment_method"] and len(rows) == 4
 print("all guard checks passed")

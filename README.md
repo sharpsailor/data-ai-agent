@@ -72,5 +72,7 @@ init/*.sql              schema, read-only role, synthetic ride-share data (200 u
 - **Self-correction:** on a DB error, the error is fed back to `Generate_SQL` for one retry.
 - **Partial state updates:** nodes return only the fields they change, so the `messages` reducer appends cleanly. DB connections are closed after every call.
 - **Generic extraction:** `extract_load` handles both paginated (`results`) and plain JSON APIs.
-- **Isolated code execution:** generated pandas code runs in a separate process with a 60 s timeout. **It is not a sandbox:** the code still has filesystem and network access. Only run trusted prompts.
+- **Isolated code execution:** generated pandas code runs in a separate process with an empty environment (no API keys or DB credentials), `data/` as its working directory and a 60 s timeout. The file preview is passed to the model as untrusted data. **This is not a sandbox:** the code still runs as your user. Only use it with trusted prompts and files. Before exposing it to others, run it in a container with `--network none --read-only` and only `data/` mounted.
+- **Confined file access:** ETL tools can only read and write inside `data/`. Absolute paths, `../` and symlinks out of it are rejected.
+- **SSRF protection:** extraction accepts only http(s) URLs that resolve to public IPs. Loopback, private ranges, cloud metadata (`169.254.169.254`) and redirects are refused.
 - **Bounded agent loop:** the ETL reason/act loop is capped with `recursion_limit`.
