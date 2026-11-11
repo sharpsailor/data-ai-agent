@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agent_db
+      POSTGRES_USER: agent_user
+      POSTGRES_PASSWORD: agent_pass
+    ports: ["127.0.0.1:5437:5432"]
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_user -d agent_db"]
+      interval: 3s
+      retries: 20
+
+  adminer:
+    image: adminer
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on: [db]
+
+volumes:
+  pgdata:

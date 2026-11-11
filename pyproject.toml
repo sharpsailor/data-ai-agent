@@ -1,0 +1,20 @@
+[project]
+name = "data-ai-agent"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=0.3",
+    "langgraph>=0.2",
+    "langchain-ollama>=0.2",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "psycopg2-binary>=2.9",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+# Free-tier cloud alternatives to local Ollama: `uv sync --extra groq` / `--extra gemini`
+groq = ["langchain-groq>=0.2"]
+gemini = ["langchain-google-genai>=2.0"]
