@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="AI Data Agent: question to router to SQL or ETL analyst">
+  <title>AI Data Agent</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d1117"/><stop offset="1" stop-color="#161b2e"/></linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6e7681"/></marker>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#21262d"/></pattern>
+  </defs>
+  <rect width="1200" height="300" rx="16" fill="url(#g)"/>
+  <rect width="1200" height="300" rx="16" fill="url(#dots)"/>
+  <g font-family="ui-sans-serif,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+    <path d="M170 150 C192.5 150 192.5 150 215 150" stroke="#484f58" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+    <path d="M355 140 C385.0 140 385.0 85 415 85" stroke="#484f58" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+    <path d="M355 160 C385.0 160 385.0 215 415 215" stroke="#484f58" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+    <path d="M575 85 C607.5 85 607.5 85 640 85" stroke="#484f58" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+    <path d="M575 215 C600.0 215 600.0 215 625 215" stroke="#484f58" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+    <text x="365" y="100" fill="#8b949e" font-size="12" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace">sql</text>
+    <text x="365" y="212" fill="#8b949e" font-size="12" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace">etl</text>
+    <rect x="20.0" y="126" width="150" height="48" rx="12" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/><text x="95" y="155" text-anchor="middle" fill="#58a6ff" font-size="15" font-weight="600">Question</text><rect x="210.0" y="126" width="150" height="48" rx="12" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/><text x="285" y="155" text-anchor="middle" fill="#d2a8ff" font-size="15" font-weight="600">Router</text><rect x="420.0" y="61" width="150" height="48" rx="12" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/><text x="495" y="90" text-anchor="middle" fill="#3fb950" font-size="15" font-weight="600">SQL Analyst</text><rect x="420.0" y="191" width="150" height="48" rx="12" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/><text x="495" y="220" text-anchor="middle" fill="#ffa657" font-size="15" font-weight="600">ETL Analyst</text><rect x="640.0" y="61" width="150" height="48" rx="12" fill="#161b22" stroke="#39c5cf" stroke-width="1.5"/><text x="715" y="90" text-anchor="middle" fill="#39c5cf" font-size="15" font-weight="600">Postgres</text><rect x="625.0" y="191" width="180" height="48" rx="12" fill="#161b22" stroke="#e3b341" stroke-width="1.5"/><text x="715" y="220" text-anchor="middle" fill="#e3b341" font-size="15" font-weight="600">API → CSV/Parquet</text>
+    <text x="1135" y="125" text-anchor="end" fill="#f0f6fc" font-size="34" font-weight="700">AI Data Agent</text>
+    <text x="1135" y="158" text-anchor="end" fill="#8b949e" font-size="15">Ask your data in plain English.</text>
+    <text x="1135" y="182" text-anchor="end" fill="#8b949e" font-size="15">LangGraph · local LLMs · $0 to run</text>
+  </g>
+</svg>

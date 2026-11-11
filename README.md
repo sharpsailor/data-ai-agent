@@ -1,78 +1,233 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="AI Data Agent: a question goes to a router, which sends it to the SQL Analyst (Postgres) or the ETL Analyst (API to CSV/Parquet)" width="100%">
+</p>
+
+<p align="center">
+  <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-multi--agent-1C3C3C?logo=langchain&logoColor=white">
+  <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white">
+  <img alt="Ollama" src="https://img.shields.io/badge/LLM-Ollama%20(local)-000000?logo=ollama&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white">
+  <img alt="Cost $0" src="https://img.shields.io/badge/running%20cost-%240-3fb950">
+</p>
+
 # AI Data Agent
 
-A multi-agent system built with LangGraph. It takes a plain-English data request and either
-**queries Postgres** (SQL Analyst) or **runs an ETL job** (ETL Analyst), with a router that decides which.
+**Ask your data questions in plain English.** A LangGraph multi-agent system with a router that sends each request to the right specialist:
 
-**Cost: $0.** LLMs run locally through Ollama, and Postgres and Adminer run in Docker.
-You can switch to a free cloud tier (Groq or Gemini) by changing one line in `.env`.
+- **SQL Analyst:** turns a question into PostgreSQL, checks that the query is read-only, runs it, and answers in plain English. If the query fails, it reads the error and fixes the query.
+- **ETL Analyst:** a ReAct agent with tools that pulls data from REST APIs into CSV, JSON or Parquet, and transforms files with pandas code that it writes itself.
 
+Everything runs locally on **free, open models through Ollama**, with Postgres in Docker. There are no API keys and no cloud bill.
+
+---
+
+## See it in action
+
+<p align="center"><img src="assets/demo-sql.svg" alt="SQL analyst answering 'top 3 drivers by average rating' and 'rides per city' with the generated SQL and plain-English answers" width="100%"></p>
+
+<p align="center"><img src="assets/demo-etl.svg" alt="ETL analyst extracting PokeAPI to CSV with a tool call, then filtering it to bulbasaur with generated pandas code" width="100%"></p>
+
+<p align="center"><img src="assets/demo-guard.svg" alt="A DELETE request is generated but blocked; guard tests show static check, read-only DB role, path confinement and SSRF protection" width="100%"></p>
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U([User question]) --> R{Router<br/><i>structured output</i>}
+    R -- sql --> SQL[SQL Analyst]
+    R -- etl --> ETL[ETL Analyst]
+    SQL <--> PG[(PostgreSQL 16<br/>read-only role)]
+    ETL --> API[(REST APIs)]
+    ETL --> FS[(data/<br/>CSV · JSON · Parquet)]
+    LLM[[Ollama · qwen2.5:3b<br/>or Groq / Gemini free tier]] -.-> R & SQL & ETL
+
+    classDef agent fill:#1f6feb22,stroke:#1f6feb,stroke-width:1.5px
+    classDef store fill:#3fb95022,stroke:#3fb950
+    class R,SQL,ETL agent
+    class PG,API,FS store
 ```
-User ─► router_node ──sql──► Curate ► Schema ctx ► Generate SQL ► Safety judge ─yes─► Execute ─ok─► Answer
-                    │                                     ▲            └─no─► Cancel       │
-                    │                                     └──── retry once with DB error ◄─┘
-                    └─etl──► llm_node ⇄ tool_node (extract_load_tool / transform_load_tool)
+
+<table>
+<tr>
+<th width="58%">SQL Analyst: pipeline with a safety gate and self-repair</th>
+<th>ETL Analyst: ReAct loop</th>
+</tr>
+<tr>
+<td>
+
+```mermaid
+flowchart TD
+    A([start]) --> C[Curate question]
+    C --> P[Attach live schema<br/>+ sample rows]
+    P --> G[Generate SQL]
+    G --> J{Safe?<br/>static check + LLM judge}
+    J -- no --> X[Cancel] --> Z([end])
+    J -- yes --> E[Execute<br/>read-only role]
+    E -- ok --> F[Plain-English answer] --> Z
+    E -- DB error --> G
+    E -- still failing --> R[Report error] --> Z
 ```
 
-Print the real Mermaid graphs with `uv run python main.py --graphs`.
+</td>
+<td>
+
+```mermaid
+flowchart TD
+    A([start]) --> L[LLM reasons<br/>bind_tools]
+    L -- tool calls --> T[Run tools]
+    T --> L
+    L -- done --> Z([end])
+    T -.-> X1[extract_load_tool<br/>API → file]
+    T -.-> X2[transform_load_tool<br/>LLM-written pandas]
+```
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>Sample database: ride-share (200 users · 40 vehicles · 1,500 rides · payments · ratings)</b></summary>
+
+```mermaid
+erDiagram
+    users ||--o{ vehicles : drives
+    users ||--o{ rides : "rider / driver"
+    rides ||--o{ payments : "paid by"
+    rides ||--o{ ratings : "rated in"
+    users {
+        int user_id PK
+        text full_name
+        text user_type "rider or driver"
+        text city
+        text province
+    }
+    rides {
+        int ride_id PK
+        int rider_id FK
+        int driver_id FK
+        timestamp start_time
+        numeric distance_km
+        numeric fare
+    }
+    payments {
+        int payment_id PK
+        int ride_id FK
+        numeric amount
+        text payment_method "card, paypal, apple_pay"
+        text payment_status "completed, failed, refunded"
+    }
+    ratings {
+        int rating_id PK
+        int ride_id FK
+        int rating "1-5"
+        text comment
+    }
+    vehicles {
+        int vehicle_id PK
+        int driver_id FK
+        text make
+        text model
+    }
+```
+
+The data is synthetic and deterministic, generated in SQL by `init/02-sample-data.sql` with no CSV files.
+</details>
+
+---
 
 ## Quick start
 
+**You need:** Python 3.12, [uv](https://docs.astral.sh/uv/), Docker and [Ollama](https://ollama.com).
+
 ```bash
-cd data-ai-agent
-cp .env.example .env              # already done here
+git clone https://github.com/sharpsailor/data-ai-agent.git && cd data-ai-agent
+cp .env.example .env
 uv sync
-docker compose up -d --wait       # Postgres on :5437 (seeded), Adminer on http://localhost:8080
-ollama pull qwen2.5:3b
+docker compose up -d --wait        # Postgres on :5437 (auto-seeded) + Adminer on :8080
+ollama pull qwen2.5:3b             # ~1.9 GB, runs on a 4 GB GPU or on CPU
 
-uv run python test_guards.py      # safety-layer checks, no LLM
 uv run python main.py "What is the average fare by city?"
-uv run python main.py             # interactive
-uv run python smoke_test.py       # 5 end-to-end scenarios with real LLM + DB
+uv run python main.py              # interactive mode
 ```
 
-Adminer login: system `PostgreSQL`, server `db`, user `agent_user`, password `agent_pass`, database `agent_db`.
+| Command | What it does |
+|---|---|
+| `uv run python main.py "<question>"` | Ask one question |
+| `uv run python main.py --graphs` | Print the compiled LangGraph graphs as Mermaid |
+| `uv run python test_guards.py` | Safety checks with no LLM: SQL guard, read-only role, path confinement, SSRF |
+| `uv run python smoke_test.py` | 5 end-to-end scenarios against the real LLM and database |
 
-## Example requests
+To browse the data, open http://localhost:8080 and log in with system `PostgreSQL`, server `db`, user `agent_user`, password `agent_pass` and database `agent_db`.
 
-| Request | Route | Result |
+### Try asking
+
+| Request | Route | What happens |
 |---|---|---|
-| What are the different types of payment methods? | sql | `SELECT DISTINCT payment_method ...`, then a plain-English answer |
-| What is the average fare by city? | sql | `GROUP BY city` |
-| Delete all failed payments | sql | Blocked; nothing is executed |
-| Extract https://pokeapi.co/api/v2/pokemon into data/extract as CSV | etl | `data/extract/extracted_data.csv` |
-| Transform data/extract/extracted_data.csv to keep only bulbasaur, save as csv in data/transform | etl | `data/transform/transformed_data.csv` |
+| *What are the different payment methods?* | `sql` | `SELECT DISTINCT payment_method …` → plain-English answer |
+| *Who are the top 3 drivers by average rating?* | `sql` | CTE + 3-table join + `ORDER BY … LIMIT 3` |
+| *Delete all failed payments* | `sql` | Blocked by the safety gate; nothing is executed |
+| *Extract https://pokeapi.co/api/v2/pokemon into data/extract as CSV* | `etl` | Writes `data/extract/extracted_data.csv` |
+| *Transform data/extract/extracted_data.csv to keep only bulbasaur, save as csv in data/transform* | `etl` | The LLM writes pandas code, which runs in an isolated process |
 
-## Models (`.env`)
+---
 
-| Option | `.env` | Cost |
+## Models: free either way
+
+Each tier is one line in `.env` (`provider:model`). Any LangChain chat model works, through `init_chat_model`.
+
+| Option | Setting | Notes |
 |---|---|---|
-| Local Ollama (default) | `LLM_BASIC=LLM_ADVANCED=ollama:qwen2.5:3b` (5/5 smoke test; `llama3.2` 4/5; `qwen2.5-coder` can't tool-call) | $0, offline |
-| Groq free tier | `LLM_*=groq:llama-3.3-70b-versatile` + `GROQ_API_KEY`, `uv sync --extra groq` | $0 within rate limits |
-| Gemini free tier | `LLM_*=google_genai:gemini-2.5-flash` + `GOOGLE_API_KEY`, `uv sync --extra gemini` | $0 within rate limits |
+| **Local Ollama** *(default)* | `ollama:qwen2.5:3b` | Free and offline. Passes 5/5 of the smoke test. |
+| Groq free tier | `groq:llama-3.3-70b-versatile` + `GROQ_API_KEY` | Much faster and more accurate. Run `uv sync --extra groq`. |
+| Gemini free tier | `google_genai:gemini-2.5-flash` + `GOOGLE_API_KEY` | Run `uv sync --extra gemini`. |
 
-Any LangChain-supported provider works, for example paid Claude via `anthropic:claude-haiku-4-5` after `uv add langchain-anthropic`.
-3B local models are slow (about 15–60 s per request on a 4 GB GPU) and sometimes write wrong SQL. A free 70B model on Groq is the easiest quality upgrade.
+There are two tiers: `LLM_BASIC` handles routing, rewording and summaries, and `LLM_ADVANCED` handles SQL, the safety judge, tool use and code generation. Point them at different models to balance cost and quality.
 
-## Layout
+> Local 3B models take about 15–60 s per request on a 4 GB GPU and sometimes write imperfect SQL. Switching to a free 70B model on Groq is the easiest upgrade. Of the local models tested, `llama3.2` passed 4/5, and `qwen2.5-coder` cannot make native tool calls.
+
+---
+
+## Security
+
+The agent runs code and SQL written by a model, so it's built on the assumption that the model will sometimes get things wrong.
+
+| Layer | Protection |
+|---|---|
+| **SQL: static check** | Only a single `SELECT`/`WITH` statement. Write keywords, stacked `;` and data-modifying CTEs are rejected. |
+| **SQL: LLM judge** | A second model reviews the query and explains any rejection. |
+| **SQL: database role** | `agent_reader` has `SELECT` only, plus `default_transaction_read_only` and a 10 s `statement_timeout`. **This is the actual guarantee.** |
+| **Files** | ETL tools can only read and write inside `data/`. Absolute paths, `../` and symlink escapes are rejected. |
+| **Network** | Extraction allows only http(s) to public IPs. Loopback, private ranges, cloud metadata and redirects are refused. |
+| **Generated code** | Runs in a separate process with an empty environment (no keys or credentials), `data/` as its working directory and a 60 s timeout. The file preview is labelled as untrusted data in the prompt. |
+| **Agent loop** | The ETL reason/act loop is capped by `recursion_limit`. |
+
+> ⚠️ **Generated pandas code is isolated but not sandboxed:** it still runs as your OS user. That's fine for local use with your own prompts. Before exposing the agent to other people, run that step in a container (`--network none --read-only`, with only `data/` mounted).
+
+---
+
+## Project structure
 
 ```
-agents/data_agent.py    router graph (structured output RouterSchema)
-agents/sql_analyst.py   SQL pipeline + safety judge + one retry on DB error
-agents/etl_analyst.py   ReAct loop over two @tools, recursion_limit=12
-models/schema.py        Pydantic state + structured-output schemas
-utils/llm_pick.py       tier -> any LangChain chat model (init_chat_model)
-utils/database.py       schema-to-text for prompts, read-only query execution
-utils/etl_tools.py      API -> csv/json/parquet, file preview, run generated pandas code
-init/*.sql              schema, read-only role, synthetic ride-share data (200 users, 1500 rides)
+agents/
+  data_agent.py     router graph (structured-output RouterSchema)
+  sql_analyst.py    SQL pipeline: curate → schema → generate → judge → execute → answer (+ retry)
+  etl_analyst.py    ReAct loop over extract_load_tool / transform_load_tool
+models/schema.py    Pydantic graph state + structured-output schemas
+utils/
+  llm_pick.py       tier → chat model (any provider via init_chat_model)
+  database.py       schema-to-text for prompts, read-only query execution, SQL static check
+  etl_tools.py      API → CSV/JSON/Parquet, file preview, path + SSRF guards, isolated code runner
+init/               schema, read-only role, synthetic seed data
+assets/             README images
 ```
 
 ## Design decisions
 
-- **Defence in depth for SQL:** writes are blocked in three layers: a static check (a single `SELECT`/`WITH` only), the LLM judge, and an `agent_reader` DB role set to `default_transaction_read_only`. The read-only role is the guarantee, because the LLM judge alone can be fooled.
-- **Self-correction:** on a DB error, the error is fed back to `Generate_SQL` for one retry.
-- **Partial state updates:** nodes return only the fields they change, so the `messages` reducer appends cleanly. DB connections are closed after every call.
-- **Generic extraction:** `extract_load` handles both paginated (`results`) and plain JSON APIs.
-- **Isolated code execution:** generated pandas code runs in a separate process with an empty environment (no API keys or DB credentials), `data/` as its working directory and a 60 s timeout. The file preview is passed to the model as untrusted data. **This is not a sandbox:** the code still runs as your user. Only use it with trusted prompts and files. Before exposing it to others, run it in a container with `--network none --read-only` and only `data/` mounted.
-- **Confined file access:** ETL tools can only read and write inside `data/`. Absolute paths, `../` and symlinks out of it are rejected.
-- **SSRF protection:** extraction accepts only http(s) URLs that resolve to public IPs. Loopback, private ranges, cloud metadata (`169.254.169.254`) and redirects are refused.
-- **Bounded agent loop:** the ETL reason/act loop is capped with `recursion_limit`.
+- **A graph of small steps over typed state.** Each node does one job and returns only the fields it changes, so every step can be tested and inspected on its own.
+- **Structured output instead of parsing text.** The router and the safety judge return Pydantic `Literal` values, so the graph branches on a type rather than on whatever text the model produces.
+- **Live schema in the prompt.** Columns, types and 5 sample rows per table are read from `information_schema` at query time, so pointing the agent at a different database needs no code change.
+- **Self-repair.** When a query fails, the database error goes back to the SQL generator for one retry before the agent gives up cleanly.
+- **Model tiering.** Cheap, fast models handle classification and summaries; stronger models are used only where code is written.

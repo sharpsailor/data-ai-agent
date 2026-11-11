@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1010" height="362" viewBox="0 0 1010 362" role="img" aria-label="data-ai-agent — ETL analyst (ReAct + tools)">
+  <title>data-ai-agent — ETL analyst (ReAct + tools)</title>
+  <rect width="1010" height="362" rx="10" fill="#0d1117"/>
+  <rect x="0.5" y="0.5" width="1009" height="361" rx="10" fill="none" stroke="#30363d"/>
+  <path d="M0 10a10 10 0 0 1 10-10h990a10 10 0 0 1 10 10v24H0z" fill="#161b22"/>
+  <line x1="0" y1="34" x2="1010" y2="34" stroke="#30363d"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
+  <text x="505.0" y="22" text-anchor="middle" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="12">data-ai-agent — ETL analyst (ReAct + tools)</text>
+  <g font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="13">
+        <text x="22" y="70" xml:space="preserve"><tspan fill="#3fb950">$ </tspan><tspan fill="#c9d1d9">uv run python main.py &quot;Extract https://pokeapi.co/api/v2/pokemon into data/extract as CSV&quot;</tspan></text>
+    <text x="22" y="90" xml:space="preserve"><tspan fill="#8b949e">[route: </tspan><tspan fill="#d2a8ff">etl</tspan><tspan fill="#8b949e">]</tspan></text>
+    <text x="22" y="110" xml:space="preserve"><tspan fill="#8b949e">  ↳ tool </tspan><tspan fill="#d2a8ff">extract_load_tool</tspan><tspan fill="#8b949e">(url=…/pokemon, output_folder=data/extract, format=csv)</tspan></text>
+    <text x="22" y="130" xml:space="preserve"><tspan fill="#8b949e">  ↳ </tspan><tspan fill="#c9d1d9">Saved 20 rows x 2 cols to data/extract/extracted_data.csv</tspan></text>
+    <text x="22" y="150" xml:space="preserve"><tspan fill="#3fb950" font-weight="600">✔ </tspan><tspan fill="#c9d1d9">The data from the API has been extracted and saved as extracted_data.csv in data/extract.</tspan></text>
+    <text x="22" y="190" xml:space="preserve"><tspan fill="#3fb950">$ </tspan><tspan fill="#c9d1d9">uv run python main.py &quot;Transform data/extract/extracted_data.csv to keep only bulbasaur, save as csv in data/transform&quot;</tspan></text>
+    <text x="22" y="210" xml:space="preserve"><tspan fill="#8b949e">[route: </tspan><tspan fill="#d2a8ff">etl</tspan><tspan fill="#8b949e">]</tspan></text>
+    <text x="22" y="230" xml:space="preserve"><tspan fill="#8b949e">  ↳ tool </tspan><tspan fill="#d2a8ff">transform_load_tool</tspan><tspan fill="#8b949e">  → model writes pandas code → runs in isolated process</tspan></text>
+    <text x="22" y="250" xml:space="preserve"><tspan fill="#3fb950" font-weight="600">✔ </tspan><tspan fill="#c9d1d9">Kept only the row where name is &#x27;bulbasaur&#x27; and saved it to data/transform.</tspan></text>
+    <text x="22" y="290" xml:space="preserve"><tspan fill="#3fb950">$ </tspan><tspan fill="#c9d1d9">cat data/transform/transformed_data.csv</tspan></text>
+    <text x="22" y="310" xml:space="preserve"><tspan fill="#8b949e">name,url</tspan></text>
+    <text x="22" y="330" xml:space="preserve"><tspan fill="#39c5cf">bulbasaur</tspan><tspan fill="#c9d1d9">,https://pokeapi.co/api/v2/pokemon/1/</tspan></text>
+  </g>
+</svg>
