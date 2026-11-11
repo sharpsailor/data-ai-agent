@@ -3,6 +3,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import uuid
 from functools import cache
 from pathlib import Path
@@ -40,6 +41,20 @@ def read_any(path: Path) -> pd.DataFrame:
     return {"csv": pd.read_csv, "json": pd.read_json, "parquet": pd.read_parquet}[path.suffix.lstrip(".")](path)
 
 
+def write_new_file(path: Path, write) -> None:
+    """data/ is writable by sandboxed code, so `path` may be a planted symlink or FIFO.
+    Write a fresh temp file (O_EXCL) and os.replace() it in: that swaps the directory entry, never follows it."""
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=path.suffix)
+    os.close(fd)
+    os.chmod(tmp, 0o644)  # mkstemp creates 0600; match normal file permissions
+    try:
+        write(tmp)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 class ETLTools:
     @staticmethod
     def extract_load(url: str, output_folder: str, format: str = "csv") -> str:
@@ -55,9 +70,9 @@ class ETLTools:
         out = resolve(output_folder)
         out.mkdir(parents=True, exist_ok=True)
         path = out / f"extracted_data.{format}"
-        {"csv": lambda: df.to_csv(path, index=False),
-         "json": lambda: df.to_json(path, orient="records", indent=2),
-         "parquet": lambda: df.to_parquet(path, index=False)}[format]()
+        write_new_file(path, lambda tmp: {"csv": lambda: df.to_csv(tmp, index=False),
+                                          "json": lambda: df.to_json(tmp, orient="records", indent=2),
+                                          "parquet": lambda: df.to_parquet(tmp, index=False)}[format]())
         return f"Saved {len(df)} rows x {len(df.columns)} cols to {path}"
 
     @staticmethod

@@ -39,6 +39,8 @@ for bad_url in ["http://127.0.0.1:5437/", "http://169.254.169.254/latest/meta-da
         pass
 # Docker sandbox for LLM-generated code.
 import os
+import shutil
+from pathlib import Path
 os.environ["SECRET_PROBE"] = "leak-me"
 
 
@@ -60,6 +62,26 @@ assert sandbox_fails(f"open('{os.path.expanduser('~')}/.ssh/id_ed25519').read()"
 assert ETLTools.execute_code("open('sandbox_probe.txt','w').write('ok'); print('wrote')").strip() == "wrote"
 assert (DATA / "sandbox_probe.txt").read_text() == "ok" and (DATA / "sandbox_probe.txt").stat().st_uid == os.getuid()
 (DATA / "sandbox_probe.txt").unlink()
+# Sandbox plants a symlink (and a FIFO) where the host will later write: host must replace them, not follow.
+import tempfile
+from utils.etl_tools import write_new_file
+victim = Path(tempfile.mkdtemp()) / "victim.txt"
+victim.write_text("untouched")
+ETLTools.execute_code(f"import os; os.makedirs('probe', exist_ok=True); os.symlink({str(victim)!r}, 'probe/out.csv'); os.mkfifo('probe/fifo.csv')")
+write_new_file(DATA / "probe/out.csv", lambda t: Path(t).write_text("new"))
+write_new_file(DATA / "probe/fifo.csv", lambda t: Path(t).write_text("new"))  # would hang if it opened the FIFO
+assert victim.read_text() == "untouched", "host write followed a planted symlink"
+assert not (DATA / "probe/out.csv").is_symlink() and (DATA / "probe/out.csv").read_text() == "new"
+assert (DATA / "probe/fifo.csv").is_file()
+try:
+    os.symlink(victim, DATA / "probe/link.csv")
+    resolve("probe/link.csv")  # reading through a symlink that leaves data/ must be refused
+    raise AssertionError("read through escaping symlink allowed")
+except ValueError:
+    pass
+shutil.rmtree(DATA / "probe")
+shutil.rmtree(victim.parent)
+
 try:
     ETLTools.execute_code("while True: pass", timeout=5)
     raise AssertionError("infinite loop not killed")

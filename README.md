@@ -159,7 +159,7 @@ uv run python main.py              # interactive mode
 |---|---|
 | `uv run python main.py "<question>"` | Ask one question |
 | `uv run python main.py --graphs` | Print the compiled LangGraph graphs as Mermaid |
-| `uv run python test_guards.py` | Safety checks with no LLM: SQL guard, read-only role, path confinement, SSRF, and sandbox escape attempts |
+| `uv run python test_guards.py` | Safety checks with no LLM: SQL guard, read-only role, path confinement, SSRF, sandbox escape attempts, and planted symlinks or FIFOs |
 | `uv run python smoke_test.py` | 5 end-to-end scenarios against the real LLM and database |
 
 To browse the data, open http://localhost:8080 and log in with system `PostgreSQL`, server `db`, user `agent_user`, password `agent_pass` and database `agent_db`.
@@ -206,7 +206,7 @@ The agent runs code and SQL written by a model, so it's built on the assumption 
 | **Generated code** | Runs in a throwaway **Docker sandbox**: `--network none`, read-only root filesystem, only `data/` mounted, no host environment or secrets, non-root user, all capabilities dropped, `no-new-privileges`, and limits of 512 MB memory, 1 CPU, 128 processes and 60 s (then killed). If Docker isn't available, the transform refuses to run. The file preview is labelled as untrusted data in the prompt. |
 | **Agent loop** | The ETL reason/act loop is capped by `recursion_limit`. |
 
-> `test_guards.py` attempts real escapes from inside the sandbox and expects every one to fail: reaching the internet, reaching the host database, reading the project `.env` or `~/.ssh` keys, writing to the root filesystem, reading host environment variables, and running an infinite loop. The remaining exposure is the `data/` folder, which the code is meant to work on.
+> `test_guards.py` attempts real escapes from inside the sandbox and expects every one to fail: reaching the internet, reaching the host database, reading the project `.env` or `~/.ssh` keys, writing to the root filesystem, reading host environment variables, running an infinite loop, and leaving a symlink or FIFO in `data/` for the host to write through later (the host writes to a fresh temp file and swaps it into place, so it never follows a link). The remaining exposure is the `data/` folder, which the code is meant to work on.
 >
 > Not covered: the extract tool checks a URL's address once, then connects, so a hostile domain could switch to an internal address in between (DNS rebinding). Pin the connection to the checked IP before letting untrusted users submit URLs.
 
